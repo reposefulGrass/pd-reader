@@ -6,40 +6,40 @@
 #include <assert.h>
 
 #include "pd_api.h"
+#include "page.h"
 
 
-static int displayFilename (const char* filename, void* userdata);
+static int iterateFiles (const char* filename, void* userdata);
 static int update (void* userdata);
 
-void copyString (char* dst, size_t dst_len, char* src, size_t src_len);
 
-
-bool files_found = false;
-
-char* text_rows[20];
-int text_rows_index = 0;
+bool 	g_files_found = false;
+page_t 	g_page;
 
 
 int
 eventHandler (PlaydateAPI* pd, PDSystemEvent event, uint32_t arg) {
-	pd->system->resetElapsedTime();
+	int res;
 
 	if (event == kEventInit) {
-		// Create /Data/com.sodachips.pdreader directory if it doesn't exist
-		pd->file->mkdir("Texts");
+		// This will create /Data/com.sodachips.pdreader directory if it doesn't exist
+		res = pd->file->mkdir("Books");
 
-		int file_err = pd->file->listfiles("Texts", displayFilename, pd, 0);
-		if (file_err == -1) {
+		pageInit(&g_page, pd);		
+
+		res = pd->file->listfiles("Books", iterateFiles, pd, 0);
+		if (res == -1) {
 			char *err_text = pd->file->geterr();
 			pd->graphics->clear(kColorWhite);
 			pd->graphics->drawText(err_text, strlen(err_text), kASCIIEncoding, 10, 10);
 		}
-		if (! files_found) {
-			char *err_text = "Please load a folder with your texts into /Data/<GameID>/Texts/\n";
+		if (! g_files_found) {
+			char *err_text = "Please load a folder with your texts into /Data/<GameID>/Books/\n";
 			pd->graphics->clear(kColorWhite);
 			pd->graphics->drawText(err_text, strlen(err_text), kASCIIEncoding, 18, 18);
 		}
 
+event_init_end:
 		pd->system->setUpdateCallback(update, pd);
 	}
 	
@@ -48,20 +48,15 @@ eventHandler (PlaydateAPI* pd, PDSystemEvent event, uint32_t arg) {
 
 
 static int
-displayFilename (const char *filename, void* userdata) {
+iterateFiles (const char *filename, void* userdata) {
 	PlaydateAPI* pd = userdata;
 
-	files_found = false;
+	g_files_found = true;
 	pd->system->logToConsole("Iterated over %s\n", filename);
 
-	size_t filename_len = strlen(filename);
-	text_rows[text_rows_index] = pd->system->realloc(NULL, filename_len);
-	copyString(text_rows[text_rows_index], filename_len, filename, filename_len);
-	text_rows_index++;
-
-	pd->graphics->clear(kColorWhite);
-	for (int i = 0; i < text_rows_index; i++) {
-		pd->graphics->drawText(text_rows[i], strlen(text_rows[i]), kASCIIEncoding, 18, 18 * (i + 1));
+	uint8_t res = pageAppend(&g_page, pd, filename);
+	if (res == -1) {
+		pd->system->logToConsole("Page ran out of lines!");
 	}
 
 	return 1;
@@ -72,16 +67,9 @@ static int
 update (void* userdata) {
 	PlaydateAPI* pd = userdata;
 
+	pageDisplay(&g_page, pd);
+
 	return 1;
 }
 
-
-void
-copyString (char* dst, size_t dst_len, char* src, size_t src_len) {
-	assert(src_len >= dst_len);
-
-	for (int i = 0; i < src_len; i++) {
-		dst[i] = src[i];
-	}	
-}
 
