@@ -14,6 +14,8 @@ static int update (void* userdata);
 void copyString (char* dst, size_t dst_len, char* src, size_t src_len);
 
 
+bool files_found = false;
+
 char* text_rows[20];
 int text_rows_index = 0;
 
@@ -32,6 +34,12 @@ eventHandler (PlaydateAPI* pd, PDSystemEvent event, uint32_t arg) {
 			pd->graphics->clear(kColorWhite);
 			pd->graphics->drawText(err_text, strlen(err_text), kASCIIEncoding, 10, 10);
 		}
+		if (! files_found) {
+			char *err_text = "Please load a folder with your texts into /Data/<GameID>/Texts/\n";
+			pd->graphics->clear(kColorWhite);
+			pd->graphics->drawText(err_text, strlen(err_text), kASCIIEncoding, 18, 18);
+		}
+
 		pd->system->setUpdateCallback(update, pd);
 	}
 	
@@ -43,6 +51,7 @@ static int
 displayFilename (const char *filename, void* userdata) {
 	PlaydateAPI* pd = userdata;
 
+	files_found = false;
 	pd->system->logToConsole("Iterated over %s\n", filename);
 
 	size_t filename_len = strlen(filename);
